@@ -3,36 +3,54 @@
  */
 package app.saikat.NotifyServer;
 
-import java.util.Arrays;
+import java.io.File;
+import java.io.IOException;
 
-import org.springframework.boot.CommandLineRunner;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+
+import app.saikat.ConfigurationManagement.ConfigurationManagerInstanceHandler;
+import app.saikat.ConfigurationManagement.interfaces.ConfigurationManager;
 
 @SpringBootApplication
 public class App {
-    public String getGreeting() {
-        return "Hello world.";
-    }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+
         SpringApplication.run(App.class, args);
     }
 
+
     @Bean
-    public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
-        return args -> {
+    public WebsocketConfigurations getConf() throws IOException {
+        
+        Gson gson = new GsonBuilder()
+        .setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+        .setPrettyPrinting()
+        .serializeNulls()
+        .create();
 
-            System.out.println("Let's inspect the beans provided by Spring Boot:");
+        File configFile = new File("NotifyServer.conf");
+        ConfigurationManager configurationManager = 
+            ConfigurationManagerInstanceHandler.createInstance(configFile, gson);
 
-            String[] beanNames = ctx.getBeanDefinitionNames();
-            Arrays.sort(beanNames);
-            for (String beanName : beanNames) {
-                System.out.println(beanName);
-            }
-
-        };
+        
+        return configurationManager.<WebsocketConfigurations>get("websocket")
+            .orElseGet( () -> {
+                WebsocketConfigurations conf = WebsocketConfigurations.getDefault();
+                configurationManager.put("websocket", conf);
+                    try {
+                        configurationManager.syncConfigurations();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                return conf;
+            });
     }
+
 }
